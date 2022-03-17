@@ -1,0 +1,678 @@
+# 连接的 Nebula Graph 版本，连接 2.x 时设置为 v2。
+version: v3
+ 
+description: fraud_detection
+ 
+# 是否删除临时生成的日志和错误数据文件。
+removeTempFiles: false
+ 
+clientSettings:
+ 
+  # nGQL 语句执行失败的重试次数。
+  retry: 3
+ 
+  # Nebula Graph 客户端并发数。
+  concurrency: 20
+ 
+  # 每个 Nebula Graph 客户端的缓存队列大小。
+  channelBufferSize: 1280
+ 
+  # 指定数据要导入的 Nebula Graph 图空间。
+  space: fraud_detection
+ 
+  # 连接信息。
+  connection:
+    user: root
+    password: nebula
+    address: 192.168.8.240:9669
+ 
+  postStart:
+    # 配置连接 Nebula Graph 服务器之后，在插入数据之前执行的一些操作。
+    commands: |
+      DROP SPACE IF EXISTS fraud_detection;
+      CREATE SPACE IF NOT EXISTS fraud_detection (partition_num=3, replica_factor=1, vid_type=FIXED_STRING(30)) comment="fraud_detection";
+      USE fraud_detection;
+      CREATE TAG P_Account (account_id string NOT NULL  ) ;
+      CREATE TAG Transaction (transid string NOT NULL , step_a int NOT NULL  , nameOrig string NOT NULL  , nameDest string NOT NULL  , amount double NOT NULL  , isFraud bool NOT NULL  , isFlaggedFraud bool NOT NULL, Fraud_amount double NOT NULL, Flagged_amount double NOT NULL) ;
+      CREATE TAG Email (email_id string NOT NULL);
+      CREATE TAG Ip (ip_add string NOT NULL);
+      CREATE TAG Phone (phone_num string NOT NULL);
+      CREATE TAG Device (device_id string NOT NULL);
+      CREATE EDGE cash_in_orig (isFraud bool NOT NULL  , isFlaggedFraud bool NOT NULL, Fraud_amount double NOT NULL, Flagged_amount double NOT NULL) ;
+      CREATE EDGE cash_in_dest (isFraud bool NOT NULL  , isFlaggedFraud bool NOT NULL, Fraud_amount double NOT NULL, Flagged_amount double NOT NULL) ;
+      CREATE EDGE cash_out_orig (isFraud bool NOT NULL  , isFlaggedFraud bool NOT NULL, Fraud_amount double NOT NULL, Flagged_amount double NOT NULL) ;
+      CREATE EDGE cash_out_dest (isFraud bool NOT NULL  , isFlaggedFraud bool NOT NULL, Fraud_amount double NOT NULL, Flagged_amount double NOT NULL) ;
+      CREATE EDGE payment_orig (isFraud bool NOT NULL  , isFlaggedFraud bool NOT NULL, Fraud_amount double NOT NULL, Flagged_amount double NOT NULL) ;
+      CREATE EDGE payment_dest (isFraud bool NOT NULL  , isFlaggedFraud bool NOT NULL, Fraud_amount double NOT NULL, Flagged_amount double NOT NULL) ;
+      CREATE EDGE debit_orig (isFraud bool NOT NULL  , isFlaggedFraud bool NOT NULL, Fraud_amount double NOT NULL, Flagged_amount double NOT NULL)  ;
+      CREATE EDGE debit_dest (isFraud bool NOT NULL  , isFlaggedFraud bool NOT NULL, Fraud_amount double NOT NULL, Flagged_amount double NOT NULL)  ;
+      CREATE EDGE transfer_orig (isFraud bool NOT NULL  , isFlaggedFraud bool NOT NULL, Fraud_amount double NOT NULL, Flagged_amount double NOT NULL)  ;
+      CREATE EDGE transfer_dest (isFraud bool NOT NULL  , isFlaggedFraud bool NOT NULL, Fraud_amount double NOT NULL, Flagged_amount double NOT NULL)  ;
+      CREATE EDGE register_email();
+      CREATE EDGE register_ip();
+      CREATE EDGE register_phone();
+      CREATE EDGE register_device();
+      CREATE EDGE transaction_device();
+      CREATE TAG INDEX i_Acc on P_Account() ;
+      CREATE TAG INDEX i_Tran on Transaction() ;
+      CREATE TAG INDEX i_Phone on Phone();
+      CREATE TAG INDEX i_Email on Email();
+      CREATE TAG INDEX i_Ip on Ip();
+      CREATE TAG INDEX i_Device on Device();
+      CREATE TAG INDEX i_accid on P_Account(account_id(30)) ;
+      CREATE TAG INDEX i_transid on Transaction(transid(30)) ;
+      CREATE TAG INDEX i_isFraud on Transaction(isFraud) ;
+      CREATE TAG INDEX i_isFlagged on Transaction(isFlaggedFraud) ;
+      CREATE TAG INDEX i_phone_num on Phone(phone_num(30)) ;
+      CREATE TAG INDEX i_email_id on Email(email_id(30)) ;
+      CREATE TAG INDEX i_ip_addr on Ip(ip_add(30)) ;
+      CREATE TAG INDEX i_device_id on Device(device_id(30)) ;
+ 
+    # 执行上述命令后到执行插入数据命令之间的间隔。
+    afterPeriod: 15s
+ 
+  preStop:
+    # 配置断开 Nebula Graph 服务器连接之前执行的一些操作。
+    commands: |
+ 
+# 错误等日志信息输出的文件路径。   
+logPath: ./err/fraud.log
+ 
+# CSV 文件相关设置。
+files:
+  - path: ./account.csv
+    failDataPath: ./err/fraud/account.csv
+    batchSize: 1024
+    type: csv
+    csv:
+      withHeader: false
+      withLabel: false
+      delimiter: ","
+    schema:
+      type: vertex
+      vertex:
+        vid:
+          index: 0
+          type: string
+        tags:
+          - name: P_Account
+            props:
+              - name: account_id
+                type: string
+                index: 0
+  - path: ./Paysim001.csv
+    failDataPath: ./err/fraud/trans.csv
+    batchSize: 1024
+    type: csv
+    csv:
+      withHeader: false
+      withLabel: false
+      delimiter: ","
+    schema:
+      type: vertex
+      vertex:
+        vid:
+          index: 12
+          type: string
+        tags:
+          - name: Transaction
+            props:
+              - name: transid
+                type: string
+                index: 0
+              - name: step_a
+                type: int
+                index: 1
+              - name: nameOrig
+                type: string
+                index: 4
+              - name: nameDest
+                type: string
+                index: 7
+              - name: amount
+                type: double
+                index: 3
+              - name: isFraud
+                type: bool
+                index: 10
+              - name: isFlaggedFraud
+                type: bool
+                index: 11
+              - name: Fraud_amount
+                type: double
+                index: 8
+              - name: Flagged_amount
+                type: double
+                index: 9
+  - path: ./email.csv
+    failDataPath: ./err/fraud/email.csv
+    batchSize: 1024
+    type: csv
+    csv:
+      withHeader: false
+      withLabel: false
+      delimiter: ","
+    schema:
+      type: vertex
+      vertex:
+        vid:
+          index: 0
+          type: string
+        tags:
+          - name: Email
+            props:
+              - name: email_id
+                type: string
+                index: 0
+  - path: ./ip.csv
+    failDataPath: ./err/fraud/ip.csv
+    batchSize: 1024
+    type: csv
+    csv:
+      withHeader: false
+      withLabel: false
+      delimiter: ","
+    schema:
+      type: vertex
+      vertex:
+        vid:
+          index: 0
+          type: string
+        tags:
+          - name: Ip
+            props:
+              - name: ip_add
+                type: string
+                index: 0
+  - path: ./phone.csv
+    failDataPath: ./err/fraud/phone.csv
+    batchSize: 1024
+    type: csv
+    csv:
+      withHeader: false
+      withLabel: false
+      delimiter: ","
+    schema:
+      type: vertex
+      vertex:
+        vid:
+          index: 0
+          type: string
+        tags:
+          - name: Phone
+            props:
+              - name: phone_num
+                type: string
+                index: 0
+  - path: ./device.csv
+    failDataPath: ./err/fraud/device.csv
+    batchSize: 1024
+    type: csv
+    csv:
+      withHeader: false
+      withLabel: false
+      delimiter: ","
+    schema:
+      type: vertex
+      vertex:
+        vid:
+          index: 0
+          type: string
+        tags:
+          - name: Device
+            props:
+              - name: device_id
+                type: string
+                index: 0
+  - path: ./cash_in.csv
+    failDataPath: ./err/fraud/cash_in_orig.csv
+    batchSize: 1024
+    type: csv
+    csv:
+      withHeader: false
+      withLabel: false
+      delimiter: ","
+    schema:
+      type: edge
+      edge:
+        name: cash_in_orig
+        withRanking: false
+        srcVID:
+          index: 4
+          type: string
+        dstVID:
+          index: 12
+          type: string
+        props:
+              - name: isFraud
+                type: bool
+                index: 10
+              - name: isFlaggedFraud
+                type: bool
+                index: 11
+              - name: Fraud_amount
+                type: double
+                index: 8
+              - name: Flagged_amount
+                type: double
+                index: 9
+  - path: ./cash_in.csv
+    failDataPath: ./err/fraud/cash_in_dest.csv
+    batchSize: 1024
+    type: csv
+    csv:
+      withHeader: false
+      withLabel: false
+      delimiter: ","
+    schema:
+      type: edge
+      edge:
+        name: cash_in_dest
+        withRanking: false
+        srcVID:
+          index: 12
+          type: string
+        dstVID:
+          index: 7
+          type: string
+        props:
+              - name: isFraud
+                type: bool
+                index: 10
+              - name: isFlaggedFraud
+                type: bool
+                index: 11
+              - name: Fraud_amount
+                type: double
+                index: 8
+              - name: Flagged_amount
+                type: double
+                index: 9
+  - path: ./cash_out.csv
+    failDataPath: ./err/fraud/cash_out_orig.csv
+    batchSize: 1024
+    type: csv
+    csv:
+      withHeader: false
+      withLabel: false
+      delimiter: ","
+    schema:
+      type: edge
+      edge:
+        name: cash_out_orig
+        withRanking: false
+        srcVID:
+          index: 4
+          type: string
+        dstVID:
+          index: 12
+          type: string
+        props:
+              - name: isFraud
+                type: bool
+                index: 10
+              - name: isFlaggedFraud
+                type: bool
+                index: 11
+              - name: Fraud_amount
+                type: double
+                index: 8
+              - name: Flagged_amount
+                type: double
+                index: 9
+  - path: ./cash_out.csv
+    failDataPath: ./err/fraud/cash_out_dest.csv
+    batchSize: 1024
+    type: csv
+    csv:
+      withHeader: false
+      withLabel: false
+      delimiter: ","
+    schema:
+      type: edge
+      edge:
+        name: cash_out_dest
+        withRanking: false
+        srcVID:
+          index: 12
+          type: string
+        dstVID:
+          index: 7
+          type: string
+        props:
+              - name: isFraud
+                type: bool
+                index: 10
+              - name: isFlaggedFraud
+                type: bool
+                index: 11
+              - name: Fraud_amount
+                type: double
+                index: 8
+              - name: Flagged_amount
+                type: double
+                index: 9
+  - path: ./debit.csv
+    failDataPath: ./err/fraud/debit_orig.csv
+    batchSize: 1024
+    type: csv
+    csv:
+      withHeader: false
+      withLabel: false
+      delimiter: ","
+    schema:
+      type: edge
+      edge:
+        name: debit_orig
+        withRanking: false
+        srcVID:
+          index: 4
+          type: string
+        dstVID:
+          index: 12
+          type: string
+        props:
+              - name: isFraud
+                type: bool
+                index: 10
+              - name: isFlaggedFraud
+                type: bool
+                index: 11
+              - name: Fraud_amount
+                type: double
+                index: 8
+              - name: Flagged_amount
+                type: double
+                index: 9
+  - path: ./debit.csv
+    failDataPath: ./err/fraud/debit_dest.csv
+    batchSize: 1024
+    type: csv
+    csv:
+      withHeader: false
+      withLabel: false
+      delimiter: ","
+    schema:
+      type: edge
+      edge:
+        name: debit_dest
+        withRanking: false
+        srcVID:
+          index: 12
+          type: string
+        dstVID:
+          index: 7
+          type: string
+        props:
+              - name: isFraud
+                type: bool
+                index: 10
+              - name: isFlaggedFraud
+                type: bool
+                index: 11
+              - name: Fraud_amount
+                type: double
+                index: 8
+              - name: Flagged_amount
+                type: double
+                index: 9
+  - path: ./payment.csv
+    failDataPath: ./err/fraud/payment_orig.csv
+    batchSize: 1024
+    type: csv
+    csv:
+      withHeader: false
+      withLabel: false
+      delimiter: ","
+    schema:
+      type: edge
+      edge:
+        name: payment_orig
+        withRanking: false
+        srcVID:
+          index: 4
+          type: string
+        dstVID:
+          index: 12
+          type: string
+        props:
+              - name: isFraud
+                type: bool
+                index: 10
+              - name: isFlaggedFraud
+                type: bool
+                index: 11
+              - name: Fraud_amount
+                type: double
+                index: 8
+              - name: Flagged_amount
+                type: double
+                index: 9
+  - path: ./payment.csv
+    failDataPath: ./err/fraud/payment_dest.csv
+    batchSize: 1024
+    type: csv
+    csv:
+      withHeader: false
+      withLabel: false
+      delimiter: ","
+    schema:
+      type: edge
+      edge:
+        name: payment_dest
+        withRanking: false
+        srcVID:
+          index: 12
+          type: string
+        dstVID:
+          index: 7
+          type: string
+        props:
+              - name: isFraud
+                type: bool
+                index: 10
+              - name: isFlaggedFraud
+                type: bool
+                index: 11
+              - name: Fraud_amount
+                type: double
+                index: 8
+              - name: Flagged_amount
+                type: double
+                index: 9
+  - path: ./transfer.csv
+    failDataPath: ./err/fraud/transfer_orig.csv
+    batchSize: 1024
+    type: csv
+    csv:
+      withHeader: false
+      withLabel: false
+      delimiter: ","
+    schema:
+      type: edge
+      edge:
+        name: transfer_orig
+        withRanking: false
+        srcVID:
+          index: 4
+          type: string
+        dstVID:
+          index: 12
+          type: string
+        props:
+              - name: isFraud
+                type: bool
+                index: 10
+              - name: isFlaggedFraud
+                type: bool
+                index: 11
+              - name: Fraud_amount
+                type: double
+                index: 8
+              - name: Flagged_amount
+                type: double
+                index: 9
+  - path: ./transfer.csv
+    failDataPath: ./err/fraud/transfer_dest.csv
+    batchSize: 1024
+    type: csv
+    csv:
+      withHeader: false
+      withLabel: false
+      delimiter: ","
+    schema:
+      type: edge
+      edge:
+        name: transfer_dest
+        withRanking: false
+        srcVID:
+          index: 12
+          type: string
+        dstVID:
+          index: 7
+          type: string
+        props:
+              - name: isFraud
+                type: bool
+                index: 10
+              - name: isFlaggedFraud
+                type: bool
+                index: 11
+              - name: Fraud_amount
+                type: double
+                index: 8
+              - name: Flagged_amount
+                type: double
+                index: 9
+  - path: ./transfer.csv
+    failDataPath: ./err/fraud/transfer_dest.csv
+    batchSize: 1024
+    type: csv
+    csv:
+      withHeader: false
+      withLabel: false
+      delimiter: ","
+    schema:
+      type: edge
+      edge:
+        name: transfer_dest
+        withRanking: false
+        srcVID:
+          index: 12
+          type: string
+        dstVID:
+          index: 7
+          type: string
+        props:
+              - name: isFraud
+                type: bool
+                index: 10
+              - name: isFlaggedFraud
+                type: bool
+                index: 11
+              - name: Fraud_amount
+                type: double
+                index: 8
+              - name: Flagged_amount
+                type: double
+                index: 9
+  - path: ./account.csv
+    failDataPath: ./err/fraud/register_email.csv
+    batchSize: 1024
+    type: csv
+    csv:
+      withHeader: false
+      withLabel: false
+      delimiter: ","
+    schema:
+      type: edge
+      edge:
+        name: register_email
+        withRanking: false
+        srcVID:
+          index: 0
+          type: string
+        dstVID:
+          index: 4
+          type: string
+        props:
+  - path: ./account.csv
+    failDataPath: ./err/fraud/register_ip.csv
+    batchSize: 1024
+    type: csv
+    csv:
+      withHeader: false
+      withLabel: false
+      delimiter: ","
+    schema:
+      type: edge
+      edge:
+        name: register_ip
+        withRanking: false
+        srcVID:
+          index: 0
+          type: string
+        dstVID:
+          index: 1
+          type: string
+        props:
+  - path: ./account.csv
+    failDataPath: ./err/fraud/register_phone.csv
+    batchSize: 1024
+    type: csv
+    csv:
+      withHeader: false
+      withLabel: false
+      delimiter: ","
+    schema:
+      type: edge
+      edge:
+        name: register_phone
+        withRanking: false
+        srcVID:
+          index: 0
+          type: string
+        dstVID:
+          index: 2
+          type: string
+        props:
+  - path: ./account.csv
+    failDataPath: ./err/fraud/register_device.csv
+    batchSize: 1024
+    type: csv
+    csv:
+      withHeader: false
+      withLabel: false
+      delimiter: ","
+    schema:
+      type: edge
+      edge:
+        name: register_device
+        withRanking: false
+        srcVID:
+          index: 0
+          type: string
+        dstVID:
+          index: 3
+          type: string
+        props:
+  - path: ./Paysim001.csv
+    failDataPath: ./err/fraud/transaction_device.csv
+    batchSize: 1024
+    type: csv
+    csv:
+      withHeader: false
+      withLabel: false
+      delimiter: ","
+    schema:
+      type: edge
+      edge:
+        name: transaction_device
+        withRanking: false
+        srcVID:
+          index: 12
+          type: string
+        dstVID:
+          index: 13
+          type: string
+        props:
