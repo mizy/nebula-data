@@ -1,0 +1,7 @@
+create space `王者荣耀`(partition_num=10,replica_factor=1,vid_type=fixed_string(32));
+use `王者荣耀`;
+create tag `英雄` ( `名称` string,`出生地` string, `头像` string, `主页` string );
+create edge `联系` (`关系` string,`关系度` string,`主页` string, `描述` string);
+
+create tag index `英雄索引` on 英雄(名称(20));  
+create edge index `联系索引` on 联系(关系(20));
