@@ -101,6 +101,9 @@ insert vertex 球队(名称) values "team228":("Wizards");
 insert vertex 球队(名称) values "team229":("热火");
 
 :sleep 20
+
+insert edge 关注(关注度) values "player100"->"player100"@0:(0);
+insert edge 关注(关注度) values "player100"->"player100"@1:(0);
 insert edge 关注(关注度) values "player100"->"player101":(95);
 insert edge 关注(关注度) values "player100"->"player125":(95);
 insert edge 关注(关注度) values "player101"->"player100":(95);
